@@ -1,0 +1,87 @@
+version: 1.0
+anchors:
+    - &WORLD world 
+services:
+    testService:
+        hostname: localhost
+        port: 6010
+        probe:
+            endpoint: /api/v1/test
+            result: 200
+            timeout: 30
+startupActions:
+    - delay: 10
+    - request:
+        target: testService
+        url: /api/v1/job
+        headers: 
+            Content-Type: application/json
+        body:
+            orchestrator_hostname: $HOSTNAME    # this isn't an actual env var, its a bash thing, we need to get this ourselves
+            workflow_exec_id: 5
+            job_exec_id: 24
+            password: dibble
+            uid: asdf-asdf-asdf-asdf
+            content: {}
+            data_store: {}
+        expectedResponse:
+            statusCode: 202
+            headers: null
+            body: null
+endpoints:
+    /random/test/endpoint:
+        get:
+            params:
+                query:
+                    test:
+                        type: boolean
+                        required: no
+                    someData:
+                        type: string
+                        required: yes
+            recieves: null
+            responses:
+                200:
+                    headers:
+                        Content-Type: application/json
+                    body: 
+                        hello: *WORLD
+                    weight: 60%
+                401:
+                    body: null
+                    weight: 10%
+                404:
+                    body: null
+                    weight: 10%
+                500:
+                    headers:
+                        Content-Type: application/json
+                    body:
+                        error: test error
+                    weight: 20%
+            actions:
+                - delay: 5
+                - request:
+                    target: testService
+                    url: /api/v1/test
+                    expectedResponse:
+                        statusCode: 200
+                        body: null
+                        headers: null
+                    headers:
+                        Content-Type: application/json
+                    body:
+                        hello: *WORLD
+    /api/v1/mediaengine/joborchestrator/{job_exec_id}/complete:
+        post:
+            params:
+                url:
+                    job_exec_id:
+                        type: integer
+            recieves: 
+                headers:
+                    Content-Type: application/json
+                body:   # use dot-paths here
+                    workflow_exec_id: integer
+                    workflow_data: object 
+            responses: 200
