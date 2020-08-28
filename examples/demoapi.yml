@@ -9,6 +9,11 @@ services:
             endpoint: /api/v1/test
             result: 200
             timeout: 30
+startupActions:
+    - delay: 10
+    - request:
+        target: testService
+        id: processJob
 requests:
     processJob:
         url: /api/v1/job
@@ -26,11 +31,16 @@ requests:
             statusCode: 202
             headers: null
             body: null
-startupActions:
-    - delay: 10
-    - request:
-        target: testService
-        id: processJob
+    testRequest:
+        url: /api/v1/test
+        headers:
+            Content-Type: application/json
+        body:
+            hello: *WORLD
+        expectedResponse:
+            statusCode: 200
+            body: null
+            headers: null
 endpoints:
     /random/test/endpoint:
         get:
@@ -66,15 +76,7 @@ endpoints:
                 - delay: 5
                 - request:
                     target: testService
-                    url: /api/v1/test
-                    expectedResponse:
-                        statusCode: 200
-                        body: null
-                        headers: null
-                    headers:
-                        Content-Type: application/json
-                    body:
-                        hello: *WORLD
+                    id: testRequest
     /api/v1/mediaengine/joborchestrator/{job_exec_id}/complete:
         post:
             params:
