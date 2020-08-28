@@ -9,10 +9,8 @@ services:
             endpoint: /api/v1/test
             result: 200
             timeout: 30
-startupActions:
-    - delay: 10
-    - request:
-        target: testService
+requests:
+    processJob:
         url: /api/v1/job
         headers: 
             Content-Type: application/json
@@ -28,6 +26,11 @@ startupActions:
             statusCode: 202
             headers: null
             body: null
+startupActions:
+    - delay: 10
+    - request:
+        target: testService
+        id: processJob
 endpoints:
     /random/test/endpoint:
         get:
