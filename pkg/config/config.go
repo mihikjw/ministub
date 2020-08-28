@@ -16,10 +16,11 @@ var yamlUnmarshal = yaml.Unmarshal
 
 // Config holds all the data required to operate the application
 type Config struct {
-	Version        float32                  `yaml:"version"`
-	Services       map[string]*Service      `yaml:"services"`
-	StartupActions []map[string]interface{} `yaml:"startupActions"`
-	Requests       map[string]*Request      `yaml:"requests"`
+	Version        float32                         `yaml:"version"`
+	Services       map[string]*Service             `yaml:"services"`
+	StartupActions []map[string]interface{}        `yaml:"startupActions"`
+	Requests       map[string]*Request             `yaml:"requests"`
+	Endpoints      map[string]map[string]*Endpoint `yaml:"endpoints"`
 }
 
 // LoadFromFile creates a new Config object from the given filepath

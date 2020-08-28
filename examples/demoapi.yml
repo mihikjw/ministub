@@ -59,19 +59,15 @@ endpoints:
                         Content-Type: application/json
                     body: 
                         hello: *WORLD
-                    weight: 60%
                 401:
                     body: null
-                    weight: 10%
                 404:
                     body: null
-                    weight: 10%
                 500:
                     headers:
                         Content-Type: application/json
                     body:
                         error: test error
-                    weight: 20%
             actions:
                 - delay: 5
                 - request:
@@ -89,4 +85,4 @@ endpoints:
                 body:   # use dot-paths here
                     workflow_exec_id: integer
                     workflow_data: object 
-            responses: 200
+            response: 200
