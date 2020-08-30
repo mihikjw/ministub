@@ -59,24 +59,28 @@ endpoints:
                         Content-Type: application/json
                     body: 
                         hello: *WORLD
+                    weight: 100
                 401:
                     body: null
+                    weight: 0
                 404:
                     body: null
+                    weight: 0
                 500:
                     headers:
                         Content-Type: application/json
                     body:
                         error: test error
+                    weight: 0
             actions:
                 - delay: 5
                 - request:
                     target: testService
                     id: testRequest
-    /api/v1/mediaengine/joborchestrator/{job_exec_id}/complete:
+    /api/v1/mediaengine/joborchestrator/:job_exec_id/complete:
         post:
             params:
-                url:
+                path:
                     job_exec_id:
                         type: integer
             recieves: 

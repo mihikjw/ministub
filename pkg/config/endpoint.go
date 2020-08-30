@@ -12,7 +12,7 @@ type Endpoint struct {
 // Parameters represents the parameters in an HTTP endpoint
 type Parameters struct {
 	Query map[string]*ParamEntry `yaml:"query"`
-	URL   map[string]*ParamEntry `yaml:"url"`
+	Path  map[string]*ParamEntry `yaml:"path"`
 }
 
 // ParamEntry represents the parameters for a single parameter

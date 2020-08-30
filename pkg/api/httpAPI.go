@@ -1,8 +1,11 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/MichaelWittgreffe/ministub/pkg/config"
 	"github.com/MichaelWittgreffe/ministub/pkg/logger"
@@ -19,7 +22,7 @@ func NewHTTPAPI(log logger.Logger, cfg *config.Config) *HTTPAPI {
 	if log == nil || cfg == nil {
 		return nil
 	}
-	api := &HTTPAPI{log: log}
+	api := &HTTPAPI{log: log, cfg: cfg}
 	http.HandleFunc("/", api.requestHandler)
 	return api
 }
@@ -29,37 +32,110 @@ func (api *HTTPAPI) ListenAndServe(addressBind string, port int) error {
 	return http.ListenAndServe(fmt.Sprintf("%s:%d", addressBind, port), nil)
 }
 
+// requestHandler is a handler for all incoming requests
 func (api *HTTPAPI) requestHandler(w http.ResponseWriter, r *http.Request) {
-	switch {
-	case r.Method == "GET":
-		api.getHandler(&w, r)
-	case r.Method == "PUT":
-		api.putHandler(&w, r)
-	case r.Method == "POST":
-		api.postHandler(&w, r)
-	case r.Method == "DELETE":
-		api.deleteHandler(&w, r)
-	default:
-		w.WriteHeader(http.StatusMethodNotAllowed)
+	entry, err := api.getEndpointEntry(r)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(err.StatusCode())
+		if data, err := json.Marshal(err); err == nil {
+			w.Write(data)
+		}
+		return
+	}
+
+	// evaluate query parameters
+	if len(entry.Params.Query) > 0 {
+		api.log.Info("Query Parameter Evaluation Not Written")
+	}
+
+	// evaluate body
+	if entry.Recieves != nil {
+		api.log.Info("Body Evaluation Not Written")
+	}
+
+	// start actions goroutine
+	if len(entry.Actions) > 0 {
+		api.log.Info("Request Actions Evaluation Not Written")
+	}
+
+	// setup return value
+	if entry.Response != 0 {
+		w.WriteHeader(entry.Response)
+		return
+	}
+
+	if len(entry.Responses) > 0 {
+		api.log.Info("Responses Evaluation Not Written")
 	}
 }
 
-// getHandler handles all GET requests
-func (api *HTTPAPI) getHandler(w *http.ResponseWriter, r *http.Request) {
-	api.log.Info("GET")
-}
+// getEndpointEntry returns the Endpoint object for an incoming request, if it cannot be found immediatly we check all of them for parameter matching
+func (api *HTTPAPI) getEndpointEntry(r *http.Request) (*config.Endpoint, *HTTPError) {
+	urlEntry, found := api.cfg.Endpoints[r.URL.Path]
+	if found {
+		if entry, found := urlEntry[strings.ToLower(r.Method)]; found {
+			return entry, nil
+		}
+		return nil, &HTTPError{"Method For URL Not Found", http.StatusMethodNotAllowed}
+	}
 
-// putHandler handles all PUT requests
-func (api *HTTPAPI) putHandler(w *http.ResponseWriter, r *http.Request) {
-	api.log.Info("PUT")
-}
+	splitIncomingURL := strings.Split(r.URL.Path, "/")
 
-// postHandler handles all POST requests
-func (api *HTTPAPI) postHandler(w *http.ResponseWriter, r *http.Request) {
-	api.log.Info("POST")
-}
+	for url, data := range api.cfg.Endpoints {
+		splitURL := strings.Split(url, "/")
+		splitURLLen := len(splitURL)
 
-// deleteHandler handles all DELETE requests
-func (api *HTTPAPI) deleteHandler(w *http.ResponseWriter, r *http.Request) {
-	api.log.Info("DELETE")
+		if len(splitIncomingURL) == splitURLLen {
+			for i, incomingBlock := range splitIncomingURL {
+				staticBlock := splitURL[i]
+
+				// its the same and we're not the last item, skip to the next block
+				if staticBlock == incomingBlock && (i+1) != splitURLLen {
+					continue
+				}
+
+				// its a parameter point, get the value and ensure its the correct type
+				if string(staticBlock[0]) == ":" {
+					if endpoint, found := data[strings.ToLower(r.Method)]; found {
+						if pe, found := endpoint.Params.Path[staticBlock[1:]]; found {
+							switch {
+							case pe.Type == "boolean":
+								lowerIncomingBlock := strings.ToLower(incomingBlock)
+								if lowerIncomingBlock != "true" && lowerIncomingBlock != "false" {
+									return nil, &HTTPError{"Path Param Not Valid Boolean Value", http.StatusBadRequest}
+								}
+							case pe.Type == "integer":
+								if _, err := strconv.Atoi(incomingBlock); err != nil {
+									return nil, &HTTPError{"Path Param Not Valid Integer Value", http.StatusBadRequest}
+								}
+							case pe.Type == "string":
+								if len(incomingBlock) == 0 {
+									return nil, &HTTPError{"Path Param Not Valid String Value", http.StatusBadRequest}
+								}
+							case pe.Type == "float":
+								if _, err := strconv.ParseFloat(incomingBlock, 64); err != nil {
+									return nil, &HTTPError{"Path Param Not Valid Float Value", http.StatusBadRequest}
+								}
+							default:
+								return nil, &HTTPError{"Path Param Type Not Supported", http.StatusBadRequest}
+							}
+						}
+					} else {
+						return nil, &HTTPError{"Method For URL Not Found", http.StatusMethodNotAllowed}
+					}
+				}
+
+				// we're on the last item and all fields have been correct
+				if (i + 1) == splitURLLen {
+					if entry, found := data[strings.ToLower(r.Method)]; found {
+						return entry, nil
+					}
+					return nil, &HTTPError{"Method For URL Not Found", http.StatusMethodNotAllowed}
+				}
+			}
+		}
+	}
+
+	return nil, &HTTPError{"URL Not Found", http.StatusNotFound}
 }
