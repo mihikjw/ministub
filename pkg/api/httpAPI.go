@@ -36,17 +36,16 @@ func (api *HTTPAPI) ListenAndServe(addressBind string, port int) error {
 func (api *HTTPAPI) requestHandler(w http.ResponseWriter, r *http.Request) {
 	entry, err := api.getEndpointEntry(r)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(err.StatusCode())
-		if data, err := json.Marshal(err); err == nil {
-			w.Write(data)
-		}
+		api.setupErrorResponse(err, w)
 		return
 	}
 
 	// evaluate query parameters
 	if len(entry.Params.Query) > 0 {
-		api.log.Info("Query Parameter Evaluation Not Written")
+		if err = api.evaluateQueryParams(entry, r); err != nil {
+			api.setupErrorResponse(err, w)
+			return
+		}
 	}
 
 	// evaluate body
@@ -118,7 +117,7 @@ func (api *HTTPAPI) getEndpointEntry(r *http.Request) (*config.Endpoint, *HTTPEr
 									return nil, &HTTPError{"Path Param Not Valid Float Value", http.StatusBadRequest}
 								}
 							default:
-								return nil, &HTTPError{"Path Param Type Not Supported", http.StatusBadRequest}
+								return nil, &HTTPError{fmt.Sprintf("Path Param Type %s Not Supported", pe.Type), http.StatusBadRequest}
 							}
 						}
 					} else {
@@ -138,4 +137,53 @@ func (api *HTTPAPI) getEndpointEntry(r *http.Request) (*config.Endpoint, *HTTPEr
 	}
 
 	return nil, &HTTPError{"URL Not Found", http.StatusNotFound}
+}
+
+// evaluateQueryParams ensures the incoming query params are compatible with the config definition for this endpoint
+func (api *HTTPAPI) evaluateQueryParams(entry *config.Endpoint, r *http.Request) *HTTPError {
+	inQueryValues := r.URL.Query()
+
+	for expectedParamName, expectedParamEntry := range entry.Params.Query {
+		inParamValue := inQueryValues.Get(expectedParamName)
+
+		if len(inParamValue) == 0 && expectedParamEntry.Required {
+			return &HTTPError{fmt.Sprintf("Missing Query Parameter: %s", expectedParamName), http.StatusBadRequest}
+		}
+
+		if len(inParamValue) > 0 {
+			switch {
+			case expectedParamEntry.Type == "boolean":
+				lowerInValue := strings.ToLower(inParamValue)
+				if lowerInValue != "true" && lowerInValue != "false" {
+					return &HTTPError{"Query Param Not Valid Boolean Value", http.StatusBadRequest}
+				}
+			case expectedParamEntry.Type == "integer":
+				if _, err := strconv.Atoi(inParamValue); err != nil {
+					return &HTTPError{"Query Param Not Valid Integer Value", http.StatusBadRequest}
+				}
+			case expectedParamEntry.Type == "string":
+				if len(inParamValue) == 0 {
+					return &HTTPError{"Query Param Not Valid String Value", http.StatusBadRequest}
+				}
+			case expectedParamEntry.Type == "float":
+				if _, err := strconv.ParseFloat(inParamValue, 64); err != nil {
+					return &HTTPError{"Path Param Not Valid Float Value", http.StatusBadRequest}
+				}
+			default:
+				return &HTTPError{fmt.Sprintf("Query Param Type %s Not Supported", expectedParamEntry.Type), http.StatusBadRequest}
+			}
+
+		}
+	}
+
+	return nil
+}
+
+// setupErrorResponse generates a standard error output ready for immediate return
+func (api *HTTPAPI) setupErrorResponse(err *HTTPError, w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(err.StatusCode())
+	if data, err := json.Marshal(err); err == nil {
+		w.Write(data)
+	}
 }
