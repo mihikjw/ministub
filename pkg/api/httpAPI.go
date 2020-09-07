@@ -98,26 +98,8 @@ func (api *HTTPAPI) getEndpointEntry(r *http.Request) (*config.Endpoint, *HTTPEr
 				if string(staticBlock[0]) == ":" {
 					if endpoint, found := data[strings.ToLower(r.Method)]; found {
 						if pe, found := endpoint.Params.Path[staticBlock[1:]]; found {
-							switch {
-							case pe.Type == "boolean":
-								lowerIncomingBlock := strings.ToLower(incomingBlock)
-								if lowerIncomingBlock != "true" && lowerIncomingBlock != "false" {
-									return nil, &HTTPError{"Path Param Not Valid Boolean Value", http.StatusBadRequest}
-								}
-							case pe.Type == "integer":
-								if _, err := strconv.Atoi(incomingBlock); err != nil {
-									return nil, &HTTPError{"Path Param Not Valid Integer Value", http.StatusBadRequest}
-								}
-							case pe.Type == "string":
-								if len(incomingBlock) == 0 {
-									return nil, &HTTPError{"Path Param Not Valid String Value", http.StatusBadRequest}
-								}
-							case pe.Type == "float":
-								if _, err := strconv.ParseFloat(incomingBlock, 64); err != nil {
-									return nil, &HTTPError{"Path Param Not Valid Float Value", http.StatusBadRequest}
-								}
-							default:
-								return nil, &HTTPError{fmt.Sprintf("Path Param Type %s Not Supported", pe.Type), http.StatusBadRequest}
+							if !api.assertValidType(incomingBlock, pe.Type) {
+								return nil, &HTTPError{fmt.Sprintf("Path Param Not Valid %s Value", pe.Type), http.StatusBadRequest}
 							}
 						}
 					} else {
@@ -150,29 +132,8 @@ func (api *HTTPAPI) evaluateQueryParams(entry *config.Endpoint, r *http.Request)
 			return &HTTPError{fmt.Sprintf("Missing Query Parameter: %s", expectedParamName), http.StatusBadRequest}
 		}
 
-		if len(inParamValue) > 0 {
-			switch {
-			case expectedParamEntry.Type == "boolean":
-				lowerInValue := strings.ToLower(inParamValue)
-				if lowerInValue != "true" && lowerInValue != "false" {
-					return &HTTPError{"Query Param Not Valid Boolean Value", http.StatusBadRequest}
-				}
-			case expectedParamEntry.Type == "integer":
-				if _, err := strconv.Atoi(inParamValue); err != nil {
-					return &HTTPError{"Query Param Not Valid Integer Value", http.StatusBadRequest}
-				}
-			case expectedParamEntry.Type == "string":
-				if len(inParamValue) == 0 {
-					return &HTTPError{"Query Param Not Valid String Value", http.StatusBadRequest}
-				}
-			case expectedParamEntry.Type == "float":
-				if _, err := strconv.ParseFloat(inParamValue, 64); err != nil {
-					return &HTTPError{"Path Param Not Valid Float Value", http.StatusBadRequest}
-				}
-			default:
-				return &HTTPError{fmt.Sprintf("Query Param Type %s Not Supported", expectedParamEntry.Type), http.StatusBadRequest}
-			}
-
+		if len(inParamValue) > 0 && !api.assertValidType(inParamValue, expectedParamEntry.Type) {
+			return &HTTPError{fmt.Sprintf("Query Param Not Valid %s Value", expectedParamEntry.Type), http.StatusBadRequest}
 		}
 	}
 
@@ -186,4 +147,31 @@ func (api *HTTPAPI) setupErrorResponse(err *HTTPError, w http.ResponseWriter) {
 	if data, err := json.Marshal(err); err == nil {
 		w.Write(data)
 	}
+}
+
+// assertValidType returns whether a given value is of the expected type
+func (api *HTTPAPI) assertValidType(value, expectedType string) bool {
+	switch {
+	case expectedType == "boolean":
+		lowerInValue := strings.ToLower(value)
+		if lowerInValue != "true" && lowerInValue != "false" {
+			return false
+		}
+	case expectedType == "integer":
+		if _, err := strconv.Atoi(value); err != nil {
+			return false
+		}
+	case expectedType == "string":
+		if len(value) == 0 {
+			return false
+		}
+	case expectedType == "float":
+		if _, err := strconv.ParseFloat(value, 64); err != nil {
+			return false
+		}
+	default:
+		return false
+	}
+
+	return true
 }
