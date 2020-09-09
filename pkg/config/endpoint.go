@@ -23,6 +23,6 @@ type ParamEntry struct {
 
 // Recieves represents the 'recieves' field of an endpoint
 type Recieves struct {
-	Headers map[string]string      `yaml:"recieves"`
+	Headers map[string]string      `yaml:"headers"`
 	Body    map[string]interface{} `yaml:"body"`
 }

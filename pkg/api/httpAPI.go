@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
@@ -48,9 +49,22 @@ func (api *HTTPAPI) requestHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// evaluate body
 	if entry.Recieves != nil {
-		api.log.Info("Body Evaluation Not Written")
+		// evaluate headers
+		if len(entry.Recieves.Headers) > 0 {
+			if err := api.evaluateHeaders(entry.Recieves, r); err != nil {
+				api.setupErrorResponse(err, w)
+				return
+			}
+		}
+
+		// evaluate body
+		if len(entry.Recieves.Body) > 0 {
+			if err := api.evaluateBody(entry.Recieves, r); err != nil {
+				api.setupErrorResponse(err, w)
+				return
+			}
+		}
 	}
 
 	// start actions goroutine
@@ -174,4 +188,28 @@ func (api *HTTPAPI) assertValidType(value, expectedType string) bool {
 	}
 
 	return true
+}
+
+// evaluateHeaders checks the request headers are valid
+func (api *HTTPAPI) evaluateHeaders(in *config.Recieves, r *http.Request) *HTTPError {
+	for exHeaderKey, exHeaderValue := range in.Headers {
+		if inHeaderValue := r.Header.Get(exHeaderKey); inHeaderValue != exHeaderValue {
+			return &HTTPError{fmt.Sprintf("Header Value %s Not Found", exHeaderKey), http.StatusBadRequest}
+		}
+	}
+	return nil
+}
+
+// evaluateBody checks the request body is valid
+func (api *HTTPAPI) evaluateBody(in *config.Recieves, r *http.Request) *HTTPError {
+	var body map[string]interface{}
+	rawBody, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return &HTTPError{"Error Reading Incoming Body", http.StatusInternalServerError}
+	}
+	if err := json.Unmarshal(rawBody, &body); err != nil {
+		return &HTTPError{"Error Decoding Incoming Body", http.StatusInternalServerError}
+	}
+
+	return nil
 }
