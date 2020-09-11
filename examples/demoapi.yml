@@ -86,7 +86,8 @@ endpoints:
             recieves: 
                 headers:
                     Content-Type: application/json
-                body:   # use dot-paths here
+                body:
                     workflow_exec_id: integer
-                    workflow_data: object 
+                    workflow_data.yeah: boolean
+                    example_array.0.foo: string
             response: 200

@@ -112,7 +112,7 @@ func (api *HTTPAPI) getEndpointEntry(r *http.Request) (*config.Endpoint, *HTTPEr
 				if string(staticBlock[0]) == ":" {
 					if endpoint, found := data[strings.ToLower(r.Method)]; found {
 						if pe, found := endpoint.Params.Path[staticBlock[1:]]; found {
-							if !api.assertValidType(incomingBlock, pe.Type) {
+							if !api.assertValidType(interface{}(incomingBlock), pe.Type) {
 								return nil, &HTTPError{fmt.Sprintf("Path Param Not Valid %s Value", pe.Type), http.StatusBadRequest}
 							}
 						}
@@ -163,24 +163,48 @@ func (api *HTTPAPI) setupErrorResponse(err *HTTPError, w http.ResponseWriter) {
 	}
 }
 
-// assertValidType returns whether a given value is of the expected type
-func (api *HTTPAPI) assertValidType(value, expectedType string) bool {
+/* assertValidType returns whether a given value is of the expected type
+if the initial conversion fails, it will convert to string then convert to type where appropriate */
+func (api *HTTPAPI) assertValidType(value interface{}, expectedType string) bool {
 	switch {
 	case expectedType == "boolean":
-		lowerInValue := strings.ToLower(value)
-		if lowerInValue != "true" && lowerInValue != "false" {
-			return false
+		if _, ok := value.(bool); !ok {
+			if strValue, ok := value.(string); ok {
+				if lowerInValue := strings.ToLower(strValue); lowerInValue != "true" && lowerInValue != "false" {
+					return false
+				}
+			} else {
+				return false
+			}
 		}
 	case expectedType == "integer":
-		if _, err := strconv.Atoi(value); err != nil {
-			return false
+		/* when raw ints come in from some types they can only be extracted as float64 - convert to int from here is always possible so
+		dont bother doing this test (cant even check its success, it always works) */
+		if _, ok := value.(float64); !ok {
+			if strValue, ok := value.(string); ok {
+				if _, err := strconv.Atoi(strValue); err != nil {
+					return false
+				}
+			} else {
+				return false
+			}
 		}
 	case expectedType == "string":
-		if len(value) == 0 {
+		if _, ok := value.(string); !ok {
 			return false
 		}
 	case expectedType == "float":
-		if _, err := strconv.ParseFloat(value, 64); err != nil {
+		if _, ok := value.(float64); !ok {
+			if _, err := strconv.ParseFloat(value.(string), 64); err != nil {
+				return false
+			}
+		}
+	case expectedType == "array":
+		if _, ok := value.([]interface{}); !ok {
+			return false
+		}
+	case expectedType == "object":
+		if _, ok := value.(map[string]interface{}); !ok {
 			return false
 		}
 	default:
@@ -211,5 +235,44 @@ func (api *HTTPAPI) evaluateBody(in *config.Recieves, r *http.Request) *HTTPErro
 		return &HTTPError{"Error Decoding Incoming Body", http.StatusInternalServerError}
 	}
 
+	for exName, exType := range in.Body {
+		if err = api.assertValidTypeFromPath(exName, exType, body); err != nil {
+			return &HTTPError{err.Error(), http.StatusBadRequest}
+		}
+	}
+
 	return nil
+}
+
+// assertValidTypeFromPath goes down a given path for a given inputBody JSON, and asserts the expected valid type when at the expected level for the given path
+func (api *HTTPAPI) assertValidTypeFromPath(path, expectedType string, inputData interface{}) error {
+	if splitPath := strings.Split(path, "."); len(splitPath) >= 1 {
+		if len(splitPath) > 1 {
+			if value, err := strconv.Atoi(splitPath[0]); err == nil {
+				nextInputData := inputData.([]interface{})[value]
+				return api.assertValidTypeFromPath(strings.Join(splitPath[1:], "."), expectedType, nextInputData)
+			} else if body, valid := inputData.(map[string]interface{}); valid {
+				nextInputData := body[splitPath[0]]
+				return api.assertValidTypeFromPath(strings.Join(splitPath[1:], "."), expectedType, nextInputData)
+			}
+			return fmt.Errorf("Invalid Path Item %s", splitPath[0])
+		}
+
+		var valueToEvaluate interface{}
+		if value, err := strconv.Atoi(splitPath[0]); err == nil {
+			valueToEvaluate = inputData.([]interface{})[value]
+		} else if body, valid := inputData.(map[string]interface{}); valid {
+			valueToEvaluate = body[splitPath[0]]
+		} else {
+			valueToEvaluate = inputData
+		}
+
+		if !api.assertValidType(valueToEvaluate, expectedType) {
+			return fmt.Errorf("%s Is Invalid Expected Type %s", path, expectedType)
+		}
+
+		return nil
+	}
+
+	return fmt.Errorf("Empty Path Given For assertValidTypeFromPath")
 }
