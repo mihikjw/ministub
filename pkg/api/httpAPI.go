@@ -14,8 +14,9 @@ import (
 
 // HTTPAPI represents the HTTP API
 type HTTPAPI struct {
-	log logger.Logger
-	cfg *config.Config
+	log   logger.Logger
+	cfg   *config.Config
+	stats map[string]interface{}
 }
 
 // NewHTTPAPI creates a new instance of HTTPAPI
@@ -23,7 +24,11 @@ func NewHTTPAPI(log logger.Logger, cfg *config.Config) *HTTPAPI {
 	if log == nil || cfg == nil {
 		return nil
 	}
-	api := &HTTPAPI{log: log, cfg: cfg}
+	api := &HTTPAPI{
+		log:   log,
+		cfg:   cfg,
+		stats: make(map[string]interface{}),
+	}
 	http.HandleFunc("/", api.requestHandler)
 	return api
 }
@@ -35,7 +40,7 @@ func (api *HTTPAPI) ListenAndServe(addressBind string, port int) error {
 
 // requestHandler is a handler for all incoming requests
 func (api *HTTPAPI) requestHandler(w http.ResponseWriter, r *http.Request) {
-	entry, err := api.getEndpointEntry(r)
+	url, entry, err := api.getEndpointEntry(r)
 	if err != nil {
 		api.setupErrorResponse(err, w)
 		return
@@ -73,24 +78,24 @@ func (api *HTTPAPI) requestHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// setup return value
-	if entry.Response != 0 {
+	if entry.Response > 0 {
 		w.WriteHeader(entry.Response)
 		return
 	}
 
 	if len(entry.Responses) > 0 {
-		api.log.Info("Responses Evaluation Not Written")
+		api.setupResponse(url, entry.Responses, w)
 	}
 }
 
 // getEndpointEntry returns the Endpoint object for an incoming request, if it cannot be found immediatly we check all of them for parameter matching
-func (api *HTTPAPI) getEndpointEntry(r *http.Request) (*config.Endpoint, *HTTPError) {
+func (api *HTTPAPI) getEndpointEntry(r *http.Request) (string, *config.Endpoint, *HTTPError) {
 	urlEntry, found := api.cfg.Endpoints[r.URL.Path]
 	if found {
 		if entry, found := urlEntry[strings.ToLower(r.Method)]; found {
-			return entry, nil
+			return "", entry, nil
 		}
-		return nil, &HTTPError{"Method For URL Not Found", http.StatusMethodNotAllowed}
+		return "", nil, &HTTPError{"Method For URL Not Found", http.StatusMethodNotAllowed}
 	}
 
 	splitIncomingURL := strings.Split(r.URL.Path, "/")
@@ -113,26 +118,26 @@ func (api *HTTPAPI) getEndpointEntry(r *http.Request) (*config.Endpoint, *HTTPEr
 					if endpoint, found := data[strings.ToLower(r.Method)]; found {
 						if pe, found := endpoint.Params.Path[staticBlock[1:]]; found {
 							if !api.assertValidType(interface{}(incomingBlock), pe.Type) {
-								return nil, &HTTPError{fmt.Sprintf("Path Param Not Valid %s Value", pe.Type), http.StatusBadRequest}
+								return "", nil, &HTTPError{fmt.Sprintf("Path Param Not Valid %s Value", pe.Type), http.StatusBadRequest}
 							}
 						}
 					} else {
-						return nil, &HTTPError{"Method For URL Not Found", http.StatusMethodNotAllowed}
+						return "", nil, &HTTPError{"Method For URL Not Found", http.StatusMethodNotAllowed}
 					}
 				}
 
 				// we're on the last item and all fields have been correct
 				if (i + 1) == splitURLLen {
 					if entry, found := data[strings.ToLower(r.Method)]; found {
-						return entry, nil
+						return url, entry, nil
 					}
-					return nil, &HTTPError{"Method For URL Not Found", http.StatusMethodNotAllowed}
+					return "", nil, &HTTPError{"Method For URL Not Found", http.StatusMethodNotAllowed}
 				}
 			}
 		}
 	}
 
-	return nil, &HTTPError{"URL Not Found", http.StatusNotFound}
+	return "", nil, &HTTPError{"URL Not Found", http.StatusNotFound}
 }
 
 // evaluateQueryParams ensures the incoming query params are compatible with the config definition for this endpoint
@@ -275,4 +280,12 @@ func (api *HTTPAPI) assertValidTypeFromPath(path, expectedType string, inputData
 	}
 
 	return fmt.Errorf("Empty Path Given For assertValidTypeFromPath")
+}
+
+// setupResponse sets up the response to the users request based on the loaded cfg
+func (api *HTTPAPI) setupResponse(url string, responses map[int]*config.Response, w http.ResponseWriter) {
+	/*
+		add the logic here for determining what the response should be, based on the config-specified weighting
+		and the previously recieved requests
+	*/
 }

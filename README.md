@@ -6,3 +6,6 @@ A small API stubbing tool for microservice dependency simulation, allows the dev
 - Define a series of follow-on subsiquent external requests, also injecting different requests to allow for failure and resilience testing
 - Extract metrics either from an API or write a results file on shutdown
 - Once all requests/responses have been satisfied, add option to exit the tool
+
+## Metrics
+Metrics are gathered from succesful requests, i.e. there was no error in the original request. For example, if you configured a weighting for 40% of client requests to a specific endpoint should return HTTP status 400, but the client request was actually warranting a response of status 400, these requests would not be considered for the weighting of the next succesful request.

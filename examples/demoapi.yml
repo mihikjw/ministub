@@ -59,19 +59,15 @@ endpoints:
                         Content-Type: application/json
                     body: 
                         hello: *WORLD
-                    weight: 100
+                    weight: 80
                 401:
-                    body: null
-                    weight: 0
-                404:
-                    body: null
-                    weight: 0
+                    weight: 10
                 500:
                     headers:
                         Content-Type: application/json
                     body:
                         error: test error
-                    weight: 0
+                    weight: 10
             actions:
                 - delay: 5
                 - request:
