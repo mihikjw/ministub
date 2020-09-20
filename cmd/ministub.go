@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"time"
 
 	"github.com/MichaelWittgreffe/ministub/pkg/api"
 	"github.com/MichaelWittgreffe/ministub/pkg/config"
@@ -31,49 +30,15 @@ func main() {
 
 	log.Info("Config Loaded, Executing Startup Actions")
 
-	if api := api.NewHTTPAPI(log, cfg); api != nil {
-		go executeStartupActions(log, cfg)
+	if server := api.NewHTTPAPI(log, cfg); server != nil {
+		go api.ExecuteActions(cfg.StartupActions, "Startup", cfg, log) // run startup actions before starting server
 
 		log.Fatal(
-			fmt.Sprintf("Fatal Error: %s",
-				api.ListenAndServe(bindHost, port).Error(),
+			fmt.Sprintf(
+				"Fatal Error: %s",
+				server.ListenAndServe(bindHost, port).Error(),
 			),
 		)
-	}
-}
-
-// executeStartupActions executes any actions specified to occur upon application startup
-func executeStartupActions(log logger.Logger, cfg *config.Config) {
-	for _, actionEntry := range cfg.StartupActions {
-		for name, action := range actionEntry {
-			switch {
-			case name == "delay":
-				if period, valid := action.(int); valid {
-					log.Info(fmt.Sprintf("Delay Requested For %d Seconds", period))
-					time.Sleep(time.Duration(period) * time.Second)
-				}
-			case name == "request":
-				var target *config.Service
-				var request *config.Request
-
-				if actionEntry, valid := action.(map[interface{}]interface{}); valid {
-					for k, v := range actionEntry {
-						switch {
-						case k.(string) == "target":
-							target = cfg.Services[v.(string)]
-						case k.(string) == "id":
-							request = cfg.Requests[v.(string)]
-						}
-					}
-				}
-
-				if target != nil && request != nil {
-					log.Info("Startup Request Requested, Currently Not Written")
-				} else {
-					log.Error("Invalid Startup Request Requested")
-				}
-			}
-		}
 	}
 }
 

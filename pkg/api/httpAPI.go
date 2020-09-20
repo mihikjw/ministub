@@ -115,7 +115,7 @@ func (api *HTTPAPI) requestHandler(w http.ResponseWriter, r *http.Request) {
 
 	// start actions
 	if len(entry.Actions) > 0 {
-		api.log.Info("Request Actions Evaluation Not Written")
+		go ExecuteActions(entry.Actions, r.URL.Path, api.cfg, api.log)
 	}
 
 	api.log.Info(fmt.Sprintf("%s | %s | %d", r.Host, r.URL.Path, statusCode))

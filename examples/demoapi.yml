@@ -5,10 +5,6 @@ services:
     testService:
         hostname: localhost
         port: 6010
-        probe:
-            endpoint: /api/v1/test
-            result: 200
-            timeout: 30
 startupActions:
     - delay: 10
     - request:
@@ -81,8 +77,12 @@ endpoints:
                     job_exec_id:
                         type: integer
             recieves: 
+                headers:
+                    Content-Type: application/json
                 body:
                     workflow_exec_id: integer
                     workflow_data.yeah: boolean
                     example_array.0.foo: string
             response: 200
+            actions:
+                - delay: 5
