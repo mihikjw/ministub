@@ -117,6 +117,9 @@ func (api *HTTPAPI) requestHandler(w http.ResponseWriter, r *http.Request) {
 	if len(entry.Actions) > 0 {
 		go ExecuteActions(entry.Actions, r.URL.Path, api.cfg, api.log)
 	}
+	if len(entry.Responses[statusCode].Actions) > 0 {
+		go ExecuteActions(entry.Responses[statusCode].Actions, r.URL.Path, api.cfg, api.log)
+	}
 
 	api.log.Info(fmt.Sprintf("%s | %s | %d", r.Host, r.URL.Path, statusCode))
 }

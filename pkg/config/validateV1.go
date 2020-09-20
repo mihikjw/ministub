@@ -65,6 +65,12 @@ func validateV1Config(cfg *Config) error {
 				totalWeight := 0
 				for _, respEntry := range entry.Responses {
 					totalWeight += respEntry.Weight
+
+					if len(respEntry.Actions) > 0 {
+						if err := validateV1Actions(respEntry.Actions, serviceNames); err != nil {
+							return fmt.Errorf("Error Validating Response Action URL %s, Method %s: %s", url, method, err.Error())
+						}
+					}
 				}
 				if totalWeight != 100 {
 					return fmt.Errorf("Response Weighting For URL %s, Method %s, Does Not Equal 100", url, method)

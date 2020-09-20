@@ -57,6 +57,11 @@ endpoints:
                     body: 
                         hello: *WORLD
                     weight: 80
+                    actions:
+                        - delay: 5
+                        - request:
+                            target: testService
+                            id: testRequest
                 401:
                     weight: 10
                 500:
@@ -65,11 +70,6 @@ endpoints:
                     body:
                         error: test error
                     weight: 10
-            actions:
-                - delay: 5
-                - request:
-                    target: testService
-                    id: testRequest
     /api/v1/mediaengine/joborchestrator/:job_exec_id/complete:
         post:
             params:
