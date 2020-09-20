@@ -12,7 +12,7 @@ import (
 
 func main() {
 	log := logger.NewLogger("std")
-	log.Info("Loading Definition")
+	log.Info("Loading Config...")
 
 	cfgPath, bindHost, port, err := parseArgs()
 	if err != nil {
@@ -28,10 +28,13 @@ func main() {
 		log.Fatal(fmt.Sprintf("Config Validation Error: %s", err.Error()))
 	}
 
-	log.Info("Config Loaded, Executing Startup Actions")
+	log.Info(fmt.Sprintf("Config Loaded From Path: %s", cfgPath))
 
 	if server := api.NewHTTPAPI(log, cfg); server != nil {
-		go api.ExecuteActions(cfg.StartupActions, "Startup", cfg, log) // run startup actions before starting server
+		if cfg.StartupActions != nil && len(cfg.StartupActions) > 0 {
+			log.Info("Executing Startup Actions...")
+			go api.ExecuteActions(cfg.StartupActions, "Startup", cfg, log)
+		}
 
 		log.Fatal(
 			fmt.Sprintf(

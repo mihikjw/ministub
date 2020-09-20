@@ -9,7 +9,7 @@
             "program": "${workspaceFolder}/cmd/ministub.go",
             "env": {},
             "args": [
-                "${workspaceFolder}/examples/demoapi.yml",
+                "${workspaceFolder}/examples/v1demoapi.yml",
                 "-b",
                 "localhost",
                 "-p",
