@@ -8,7 +8,13 @@
             "mode": "auto",
             "program": "${workspaceFolder}/cmd/ministub.go",
             "env": {},
-            "args": ["${workspaceFolder}/examples/demoapi.yml"]
+            "args": [
+                "${workspaceFolder}/examples/demoapi.yml",
+                "-b",
+                "localhost",
+                "-p",
+                "8080"
+            ]
         }
     ]
 }
