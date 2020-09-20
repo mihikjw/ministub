@@ -25,6 +25,10 @@ func main() {
 		log.Fatal(fmt.Sprintf("Unable To Load From From Path %s: %s", cfgPath, err.Error()))
 	}
 
+	if err = config.Validate(cfg); err != nil {
+		log.Fatal(fmt.Sprintf("Config Validation Error: %s", err.Error()))
+	}
+
 	log.Info("Config Loaded, Executing Startup Actions")
 
 	if api := api.NewHTTPAPI(log, cfg); api != nil {
@@ -38,6 +42,7 @@ func main() {
 	}
 }
 
+// executeStartupActions executes any actions specified to occur upon application startup
 func executeStartupActions(log logger.Logger, cfg *config.Config) {
 	for _, actionEntry := range cfg.StartupActions {
 		for name, action := range actionEntry {
@@ -84,7 +89,7 @@ func parseArgs() (cfgPath string, bind string, port int, err error) {
 		case data == "-b":
 			bind = os.Args[i+1]
 		default:
-			if i > 0 && os.Args[i-1] != "-p" && os.Args[i-1] != "-h" {
+			if i > 0 && os.Args[i-1] != "-p" && os.Args[i-1] != "-b" {
 				cfgPath = os.Args[i]
 			}
 		}
