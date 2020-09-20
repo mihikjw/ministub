@@ -57,6 +57,7 @@ endpoints:
                 200:
                     headers:
                         Content-Type: application/json
+                        Foo: Bar
                     body: 
                         hello: *WORLD
                     weight: 80
@@ -80,8 +81,6 @@ endpoints:
                     job_exec_id:
                         type: integer
             recieves: 
-                headers:
-                    Content-Type: application/json
                 body:
                     workflow_exec_id: integer
                     workflow_data.yeah: boolean

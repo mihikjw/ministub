@@ -4,8 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
-	"strconv"
+	"os"
 	"strings"
 
 	"github.com/MichaelWittgreffe/ministub/pkg/config"
@@ -16,7 +17,7 @@ import (
 type HTTPAPI struct {
 	log   logger.Logger
 	cfg   *config.Config
-	stats map[string]interface{}
+	stats map[string]map[int]int // url -> statusCode: count
 }
 
 // NewHTTPAPI creates a new instance of HTTPAPI
@@ -27,7 +28,7 @@ func NewHTTPAPI(log logger.Logger, cfg *config.Config) *HTTPAPI {
 	api := &HTTPAPI{
 		log:   log,
 		cfg:   cfg,
-		stats: make(map[string]interface{}),
+		stats: make(map[string]map[int]int),
 	}
 	http.HandleFunc("/", api.requestHandler)
 	return api
@@ -35,21 +36,46 @@ func NewHTTPAPI(log logger.Logger, cfg *config.Config) *HTTPAPI {
 
 // ListenAndServe begins the API listening for requests
 func (api *HTTPAPI) ListenAndServe(addressBind string, port int) error {
+	api.log.Info(fmt.Sprintf("Beginning Listening For HTTP Requests On %s:%d", addressBind, port))
 	return http.ListenAndServe(fmt.Sprintf("%s:%d", addressBind, port), nil)
 }
 
 // requestHandler is a handler for all incoming requests
 func (api *HTTPAPI) requestHandler(w http.ResponseWriter, r *http.Request) {
+	// check own endpoints first
+	switch {
+	case r.URL.Path == "/stats":
+		api.statsHandler(w)
+		api.log.Info(fmt.Sprintf("%s | %s | %d", r.Host, r.URL.Path, http.StatusOK))
+		return
+	case r.URL.Path == "/exit":
+		api.exitHandler()
+	}
+
+	// get the entry for the incoming request
 	url, entry, err := api.getEndpointEntry(r)
 	if err != nil {
 		api.setupErrorResponse(err, w)
+		api.log.Error(fmt.Sprintf("%s | %s | %d - %s", r.Host, r.URL.Path, err.StatusCode(), err.Error()))
 		return
+	}
+
+	// get stats entry before any processing
+	stats, found := api.stats[url]
+	if !found {
+		api.addEndpointToStats(url, entry.Responses)
+		if stats, found = api.stats[url]; !found {
+			api.setupErrorResponse(&HTTPError{fmt.Sprintf("Unable To Init Stats For Endpoint: %s", url), http.StatusInternalServerError}, w)
+			api.log.Error(fmt.Sprintf("%s | %s | %d - %s", r.Host, r.URL.Path, err.StatusCode(), err.Error()))
+			return
+		}
 	}
 
 	// evaluate query parameters
 	if len(entry.Params.Query) > 0 {
 		if err = api.evaluateQueryParams(entry, r); err != nil {
 			api.setupErrorResponse(err, w)
+			api.log.Error(fmt.Sprintf("%s | %s | %d - %s", r.Host, r.URL.Path, err.StatusCode(), err.Error()))
 			return
 		}
 	}
@@ -59,6 +85,7 @@ func (api *HTTPAPI) requestHandler(w http.ResponseWriter, r *http.Request) {
 		if len(entry.Recieves.Headers) > 0 {
 			if err := api.evaluateHeaders(entry.Recieves, r); err != nil {
 				api.setupErrorResponse(err, w)
+				api.log.Error(fmt.Sprintf("%s | %s | %d - %s", r.Host, r.URL.Path, err.StatusCode(), err.Error()))
 				return
 			}
 		}
@@ -67,25 +94,31 @@ func (api *HTTPAPI) requestHandler(w http.ResponseWriter, r *http.Request) {
 		if len(entry.Recieves.Body) > 0 {
 			if err := api.evaluateBody(entry.Recieves, r); err != nil {
 				api.setupErrorResponse(err, w)
+				api.log.Error(fmt.Sprintf("%s | %s | %d - %s", r.Host, r.URL.Path, err.StatusCode(), err.Error()))
 				return
 			}
 		}
 	}
 
-	// start actions goroutine
+	// setup return value
+	var statusCode int
+	if entry.Response > 0 {
+		statusCode = entry.Response
+		w.WriteHeader(statusCode)
+	} else if len(entry.Responses) > 0 {
+		statusCode = api.setupResponse(url, entry.Responses, w)
+	}
+
+	// increment stats
+	stats[statusCode]++
+	api.stats[url] = stats
+
+	// start actions
 	if len(entry.Actions) > 0 {
 		api.log.Info("Request Actions Evaluation Not Written")
 	}
 
-	// setup return value
-	if entry.Response > 0 {
-		w.WriteHeader(entry.Response)
-		return
-	}
-
-	if len(entry.Responses) > 0 {
-		api.setupResponse(url, entry.Responses, w)
-	}
+	api.log.Info(fmt.Sprintf("%s | %s | %d", r.Host, r.URL.Path, statusCode))
 }
 
 // getEndpointEntry returns the Endpoint object for an incoming request, if it cannot be found immediatly we check all of them for parameter matching
@@ -93,7 +126,7 @@ func (api *HTTPAPI) getEndpointEntry(r *http.Request) (string, *config.Endpoint,
 	urlEntry, found := api.cfg.Endpoints[r.URL.Path]
 	if found {
 		if entry, found := urlEntry[strings.ToLower(r.Method)]; found {
-			return "", entry, nil
+			return r.URL.Path, entry, nil
 		}
 		return "", nil, &HTTPError{"Method For URL Not Found", http.StatusMethodNotAllowed}
 	}
@@ -117,7 +150,7 @@ func (api *HTTPAPI) getEndpointEntry(r *http.Request) (string, *config.Endpoint,
 				if string(staticBlock[0]) == ":" {
 					if endpoint, found := data[strings.ToLower(r.Method)]; found {
 						if pe, found := endpoint.Params.Path[staticBlock[1:]]; found {
-							if !api.assertValidType(interface{}(incomingBlock), pe.Type) {
+							if !AssertValidType(interface{}(incomingBlock), pe.Type) {
 								return "", nil, &HTTPError{fmt.Sprintf("Path Param Not Valid %s Value", pe.Type), http.StatusBadRequest}
 							}
 						}
@@ -151,7 +184,7 @@ func (api *HTTPAPI) evaluateQueryParams(entry *config.Endpoint, r *http.Request)
 			return &HTTPError{fmt.Sprintf("Missing Query Parameter: %s", expectedParamName), http.StatusBadRequest}
 		}
 
-		if len(inParamValue) > 0 && !api.assertValidType(inParamValue, expectedParamEntry.Type) {
+		if len(inParamValue) > 0 && !AssertValidType(inParamValue, expectedParamEntry.Type) {
 			return &HTTPError{fmt.Sprintf("Query Param Not Valid %s Value", expectedParamEntry.Type), http.StatusBadRequest}
 		}
 	}
@@ -166,57 +199,6 @@ func (api *HTTPAPI) setupErrorResponse(err *HTTPError, w http.ResponseWriter) {
 	if data, err := json.Marshal(err); err == nil {
 		w.Write(data)
 	}
-}
-
-/* assertValidType returns whether a given value is of the expected type
-if the initial conversion fails, it will convert to string then convert to type where appropriate */
-func (api *HTTPAPI) assertValidType(value interface{}, expectedType string) bool {
-	switch {
-	case expectedType == "boolean":
-		if _, ok := value.(bool); !ok {
-			if strValue, ok := value.(string); ok {
-				if lowerInValue := strings.ToLower(strValue); lowerInValue != "true" && lowerInValue != "false" {
-					return false
-				}
-			} else {
-				return false
-			}
-		}
-	case expectedType == "integer":
-		/* when raw ints come in from some types they can only be extracted as float64 - convert to int from here is always possible so
-		dont bother doing this test (cant even check its success, it always works) */
-		if _, ok := value.(float64); !ok {
-			if strValue, ok := value.(string); ok {
-				if _, err := strconv.Atoi(strValue); err != nil {
-					return false
-				}
-			} else {
-				return false
-			}
-		}
-	case expectedType == "string":
-		if _, ok := value.(string); !ok {
-			return false
-		}
-	case expectedType == "float":
-		if _, ok := value.(float64); !ok {
-			if _, err := strconv.ParseFloat(value.(string), 64); err != nil {
-				return false
-			}
-		}
-	case expectedType == "array":
-		if _, ok := value.([]interface{}); !ok {
-			return false
-		}
-	case expectedType == "object":
-		if _, ok := value.(map[string]interface{}); !ok {
-			return false
-		}
-	default:
-		return false
-	}
-
-	return true
 }
 
 // evaluateHeaders checks the request headers are valid
@@ -241,7 +223,7 @@ func (api *HTTPAPI) evaluateBody(in *config.Recieves, r *http.Request) *HTTPErro
 	}
 
 	for exName, exType := range in.Body {
-		if err = api.assertValidTypeFromPath(exName, exType, body); err != nil {
+		if err = AssertValidTypeFromPath(exName, exType, body); err != nil {
 			return &HTTPError{err.Error(), http.StatusBadRequest}
 		}
 	}
@@ -249,43 +231,89 @@ func (api *HTTPAPI) evaluateBody(in *config.Recieves, r *http.Request) *HTTPErro
 	return nil
 }
 
-// assertValidTypeFromPath goes down a given path for a given inputBody JSON, and asserts the expected valid type when at the expected level for the given path
-func (api *HTTPAPI) assertValidTypeFromPath(path, expectedType string, inputData interface{}) error {
-	if splitPath := strings.Split(path, "."); len(splitPath) >= 1 {
-		if len(splitPath) > 1 {
-			if value, err := strconv.Atoi(splitPath[0]); err == nil {
-				nextInputData := inputData.([]interface{})[value]
-				return api.assertValidTypeFromPath(strings.Join(splitPath[1:], "."), expectedType, nextInputData)
-			} else if body, valid := inputData.(map[string]interface{}); valid {
-				nextInputData := body[splitPath[0]]
-				return api.assertValidTypeFromPath(strings.Join(splitPath[1:], "."), expectedType, nextInputData)
+// setupResponse sets up the response to the users request based on the loaded cfg
+func (api *HTTPAPI) setupResponse(url string, responses map[int]*config.Response, w http.ResponseWriter) int {
+	var statusCode int
+	var resp *config.Response
+
+	if len(responses) > 1 {
+		// setup based on specified weighting
+		store := make([]int, 10)
+		var addCount int
+		processCount := 0
+		addIndex := 0
+
+		for statusCode, respEntry := range responses {
+			addCount = respEntry.Weight / 10
+			processCount = 0
+
+			for processCount < addCount {
+				store[addIndex] = statusCode
+				processCount++
+				addIndex++
 			}
-			return fmt.Errorf("Invalid Path Item %s", splitPath[0])
 		}
 
-		var valueToEvaluate interface{}
-		if value, err := strconv.Atoi(splitPath[0]); err == nil {
-			valueToEvaluate = inputData.([]interface{})[value]
-		} else if body, valid := inputData.(map[string]interface{}); valid {
-			valueToEvaluate = body[splitPath[0]]
-		} else {
-			valueToEvaluate = inputData
+		statusCode = store[rand.Intn(len(store))]
+		resp = responses[statusCode]
+	} else {
+		// single response defined, just set it up
+		for foundStatusCode, foundResp := range responses {
+			statusCode = foundStatusCode
+			resp = foundResp
 		}
-
-		if !api.assertValidType(valueToEvaluate, expectedType) {
-			return fmt.Errorf("%s Is Invalid Expected Type %s", path, expectedType)
-		}
-
-		return nil
 	}
 
-	return fmt.Errorf("Empty Path Given For assertValidTypeFromPath")
+	if len(resp.Headers) > 0 {
+		for headerName, headerVal := range resp.Headers {
+			w.Header().Set(headerName, headerVal)
+		}
+	}
+
+	w.WriteHeader(statusCode)
+
+	if resp.Body != nil {
+		if data, err := json.Marshal(resp.Body); err == nil {
+			w.Write(data)
+		} else {
+			api.setupErrorResponse(&HTTPError{
+				fmt.Sprintf("Unable To Write Response Body For Endpoint %s: %s", url, err.Error()),
+				http.StatusInternalServerError,
+			}, w)
+		}
+	}
+
+	return statusCode
 }
 
-// setupResponse sets up the response to the users request based on the loaded cfg
-func (api *HTTPAPI) setupResponse(url string, responses map[int]*config.Response, w http.ResponseWriter) {
-	/*
-		add the logic here for determining what the response should be, based on the config-specified weighting
-		and the previously recieved requests
-	*/
+// addEndpointToStats adds the given url to the statistics with zero-values for all status codes
+func (api *HTTPAPI) addEndpointToStats(url string, responses map[int]*config.Response) {
+	stats := make(map[int]int, len(responses))
+
+	for statusCode := range responses {
+		stats[statusCode] = 0
+	}
+
+	api.stats[url] = stats
+}
+
+// statsHandler returns the current application stats as JSON
+func (api *HTTPAPI) statsHandler(w http.ResponseWriter) {
+	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	if data, err := json.Marshal(api.stats); err == nil {
+		w.Write(data)
+	} else {
+		api.setupErrorResponse(&HTTPError{
+			fmt.Sprintf("Unable To Write Response Body For Endpoint /stats: %s", err.Error()),
+			http.StatusInternalServerError,
+		}, w)
+	}
+}
+
+// exitHandler quits the application
+func (api *HTTPAPI) exitHandler() {
+	api.log.Info("Exit Requested, Shutting Down...")
+	os.Exit(0)
 }
