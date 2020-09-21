@@ -18,10 +18,11 @@ type HTTPAPI struct {
 	log   logger.Logger
 	cfg   *config.Config
 	stats map[string]map[int]int // url -> statusCode: count
+	req   Requester
 }
 
 // NewHTTPAPI creates a new instance of HTTPAPI
-func NewHTTPAPI(log logger.Logger, cfg *config.Config) *HTTPAPI {
+func NewHTTPAPI(log logger.Logger, cfg *config.Config, req Requester) *HTTPAPI {
 	if log == nil || cfg == nil {
 		return nil
 	}
@@ -29,6 +30,7 @@ func NewHTTPAPI(log logger.Logger, cfg *config.Config) *HTTPAPI {
 		log:   log,
 		cfg:   cfg,
 		stats: make(map[string]map[int]int),
+		req:   req,
 	}
 	http.HandleFunc("/", api.requestHandler)
 	return api
@@ -115,10 +117,10 @@ func (api *HTTPAPI) requestHandler(w http.ResponseWriter, r *http.Request) {
 
 	// start actions
 	if len(entry.Actions) > 0 {
-		go ExecuteActions(entry.Actions, r.URL.Path, api.cfg, api.log)
+		go ExecuteActions(entry.Actions, r.URL.Path, api.cfg, api.log, api.req)
 	}
 	if len(entry.Responses[statusCode].Actions) > 0 {
-		go ExecuteActions(entry.Responses[statusCode].Actions, r.URL.Path, api.cfg, api.log)
+		go ExecuteActions(entry.Responses[statusCode].Actions, r.URL.Path, api.cfg, api.log, api.req)
 	}
 
 	api.log.Info(fmt.Sprintf("%s | %s | %d", r.Host, r.URL.Path, statusCode))

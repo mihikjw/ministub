@@ -43,3 +43,24 @@ func supportedAction(toCheck string) bool {
 		return false
 	}
 }
+
+// validateJSON ensures the given input JSON is valid (all keys are string)
+func validateJSON(input interface{}) interface{} {
+	if json, valid := input.(map[string]interface{}); valid {
+		correctOutput := make(map[string]interface{}, len(json))
+		for k, v := range json {
+			correctOutput[k] = validateJSON(v)
+		}
+		return correctOutput
+	}
+	if invalidJSON, valid := input.(map[interface{}]interface{}); valid {
+		correctJSON := make(map[string]interface{}, len(invalidJSON))
+		for k, v := range invalidJSON {
+			if newK, valid := k.(string); valid {
+				correctJSON[newK] = v
+			}
+		}
+		return correctJSON
+	}
+	return input
+}

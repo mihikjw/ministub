@@ -13,6 +13,7 @@ startupActions:
 requests:
     processJob:
         url: /api/v1/job
+        method: post
         headers: 
             Content-Type: application/json
         body:
@@ -29,6 +30,7 @@ requests:
             body: null
     testRequest:
         url: /api/v1/test
+        method: get
         headers:
             Content-Type: application/json
         body:

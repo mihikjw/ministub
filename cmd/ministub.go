@@ -30,10 +30,12 @@ func main() {
 
 	log.Info(fmt.Sprintf("Config Loaded From Path: %s", cfgPath))
 
-	if server := api.NewHTTPAPI(log, cfg); server != nil {
+	requester := api.NewRequester("http")
+
+	if server := api.NewHTTPAPI(log, cfg, requester); server != nil {
 		if cfg.StartupActions != nil && len(cfg.StartupActions) > 0 {
 			log.Info("Executing Startup Actions...")
-			go api.ExecuteActions(cfg.StartupActions, "Startup", cfg, log)
+			go api.ExecuteActions(cfg.StartupActions, "Startup", cfg, log, requester)
 		}
 
 		log.Fatal(

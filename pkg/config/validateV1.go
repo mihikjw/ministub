@@ -26,8 +26,14 @@ func validateV1Config(cfg *Config) error {
 			if len(entry.URL) == 0 {
 				return fmt.Errorf("URL For Request %s Is Empty", reqName)
 			}
+			if !validateV1Method(entry.Method) {
+				return fmt.Errorf("Method %s Not Supported", entry.Method)
+			}
 			if entry.ExpectedResponse != nil && entry.ExpectedResponse.StatusCode == 0 {
 				return fmt.Errorf("Status Code For Request %s Is Invalid", reqName)
+			}
+			if entry.Body != nil && len(entry.Body) > 0 {
+				entry.Body = validateJSON(entry.Body).(map[string]interface{})
 			}
 		}
 	}
@@ -126,4 +132,20 @@ func validateV1Parameters(params map[string]*ParamEntry) error {
 		}
 	}
 	return nil
+}
+
+// validateV1Method checks if the given http method is valid
+func validateV1Method(method string) bool {
+	switch {
+	case method == "get":
+		return true
+	case method == "post":
+		return true
+	case method == "put":
+		return true
+	case method == "delete":
+		return true
+	default:
+		return false
+	}
 }
