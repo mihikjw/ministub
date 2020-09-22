@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/MichaelWittgreffe/ministub/pkg/config"
@@ -14,6 +15,7 @@ import (
 // HTTPRequester sends HTTP/1.1 requests, is thread-safe
 type HTTPRequester struct {
 	client *http.Client
+	mutex  sync.Mutex
 }
 
 // NewHTTPRequester is a constructor for HTTPRequester
@@ -50,6 +52,9 @@ func (h *HTTPRequester) Request(tgt *config.Service, req *config.Request) error 
 			request.Header.Add(headerKey, headerVal)
 		}
 	}
+
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
 
 	resp, err := h.client.Do(request)
 	if err != nil {
