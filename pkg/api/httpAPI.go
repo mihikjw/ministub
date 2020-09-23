@@ -74,7 +74,7 @@ func (api *HTTPAPI) requestHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// evaluate query parameters
-	if len(entry.Params.Query) > 0 {
+	if entry.Params != nil && len(entry.Params.Query) > 0 {
 		if err = api.evaluateQueryParams(entry, r); err != nil {
 			api.setupErrorResponse(err, w)
 			api.log.Error(fmt.Sprintf("%s | %s | %d - %s", r.Host, r.URL.Path, err.StatusCode(), err.Error()))
@@ -119,7 +119,7 @@ func (api *HTTPAPI) requestHandler(w http.ResponseWriter, r *http.Request) {
 	if len(entry.Actions) > 0 {
 		go ExecuteActions(entry.Actions, r.URL.Path, api.cfg, api.log, api.req)
 	}
-	if len(entry.Responses[statusCode].Actions) > 0 {
+	if entry.Responses != nil && len(entry.Responses[statusCode].Actions) > 0 {
 		go ExecuteActions(entry.Responses[statusCode].Actions, r.URL.Path, api.cfg, api.log, api.req)
 	}
 

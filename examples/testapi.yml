@@ -1,0 +1,16 @@
+version: 1.0
+endpoints:
+    /api/v1/test:
+        get:
+            recieves:
+                headers:
+                    Content-Type: application/json
+                body:
+                    hello: string
+            responses:
+                200:
+                    headers:
+                        Content-Type: application/json
+                    body:
+                        alive: true
+                    weight: 100

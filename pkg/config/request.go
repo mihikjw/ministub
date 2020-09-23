@@ -4,6 +4,7 @@ package config
 type Request struct {
 	URL              string                 `yaml:"url"`
 	Method           string                 `yaml:"method"`
+	Protocol         string                 `yaml:"protocol"`
 	Headers          map[string]string      `yaml:"headers"`
 	Body             map[string]interface{} `yaml:"body"`
 	ExpectedResponse *Response              `yaml:"expectedResponse"`

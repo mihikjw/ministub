@@ -7,12 +7,13 @@ services:
         port: 6010
 startupActions:
     - delay: 10
-    - request:
-        target: testService
-        id: processJob
+    # - request:
+    #     target: testService
+    #     id: processJob
 requests:
     processJob:
         url: /api/v1/job
+        protocol: http
         method: post
         headers: 
             Content-Type: application/json
@@ -37,8 +38,10 @@ requests:
             hello: *WORLD
         expectedResponse:
             statusCode: 200
-            body: null
-            headers: null
+            body:
+                alive: boolean
+            headers: 
+                Content-Type: application/json
 endpoints:
     /random/test/endpoint:
         get:

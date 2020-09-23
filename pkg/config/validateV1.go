@@ -1,6 +1,8 @@
 package config
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // validateV1Config validates an incoming config against version 1
 func validateV1Config(cfg *Config) error {
@@ -27,10 +29,26 @@ func validateV1Config(cfg *Config) error {
 				return fmt.Errorf("URL For Request %s Is Empty", reqName)
 			}
 			if !validateV1Method(entry.Method) {
-				return fmt.Errorf("Method %s Not Supported", entry.Method)
+				return fmt.Errorf("Method %s For Request %s Not Supported", entry.Method, reqName)
 			}
-			if entry.ExpectedResponse != nil && entry.ExpectedResponse.StatusCode == 0 {
-				return fmt.Errorf("Status Code For Request %s Is Invalid", reqName)
+			if len(entry.Protocol) > 0 {
+				if !validateV1Protocol(entry.Protocol) {
+					return fmt.Errorf("Protocol %s For Request %s Not Supported", entry.Protocol, reqName)
+				}
+			} else {
+				entry.Protocol = "http" // default if ommitted
+			}
+			if entry.ExpectedResponse != nil {
+				if entry.ExpectedResponse.StatusCode == 0 {
+					return fmt.Errorf("Status Code For Request %s Is Invalid", reqName)
+				}
+				if entry.ExpectedResponse.Body != nil && len(entry.ExpectedResponse.Body) > 0 {
+					for expectedField, expectedType := range entry.ExpectedResponse.Body {
+						if strExpectedType, ok := expectedType.(string); ok && !supportedType(strExpectedType) {
+							return fmt.Errorf("Request %s Expected Response Invalid Expected Type For Field %s: %s", reqName, expectedField, expectedType)
+						}
+					}
+				}
 			}
 			if entry.Body != nil && len(entry.Body) > 0 {
 				entry.Body = validateJSON(entry.Body).(map[string]interface{})
@@ -44,14 +62,16 @@ func validateV1Config(cfg *Config) error {
 
 	for url, methodMap := range cfg.Endpoints {
 		for method, entry := range methodMap {
-			if len(entry.Params.Path) > 0 {
-				if err := validateV1Parameters(entry.Params.Path); err != nil {
-					return fmt.Errorf("Path Param For URL %s, Method %s Not Valid: %s", url, method, err.Error())
+			if entry.Params != nil {
+				if len(entry.Params.Path) > 0 {
+					if err := validateV1Parameters(entry.Params.Path); err != nil {
+						return fmt.Errorf("Path Param For URL %s, Method %s Not Valid: %s", url, method, err.Error())
+					}
 				}
-			}
-			if len(entry.Params.Query) > 0 {
-				if err := validateV1Parameters(entry.Params.Query); err != nil {
-					return fmt.Errorf("Query Param For URL %s, Method %s Not Valid: %s", url, method, err.Error())
+				if len(entry.Params.Query) > 0 {
+					if err := validateV1Parameters(entry.Params.Query); err != nil {
+						return fmt.Errorf("Query Param For URL %s, Method %s Not Valid: %s", url, method, err.Error())
+					}
 				}
 			}
 
@@ -144,6 +164,18 @@ func validateV1Method(method string) bool {
 	case method == "put":
 		return true
 	case method == "delete":
+		return true
+	default:
+		return false
+	}
+}
+
+// validateV1Protocol checks if the given protocol is valid
+func validateV1Protocol(protocol string) bool {
+	switch {
+	case protocol == "http":
+		return true
+	case protocol == "https":
 		return true
 	default:
 		return false
