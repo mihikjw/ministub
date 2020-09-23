@@ -1,15 +1,13 @@
 version: '3'
-networks:
-    app-net:
-        internal: false
 services:
     ministub:
         container_name: ministub
         build:
             context: .
             dockerfile: Dockerfile
-        image: mw/ministub:0.0.1
-        networks:
-            - app-net
+        image: ministub:0.0.1
+        command: "/code/ministub /schemas/testapi.yml"
+        volumes:
+            - ./examples:/schemas
         ports:
-            - 6006:80
+            - 6006:8080

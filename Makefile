@@ -5,9 +5,10 @@ all:
 
 install: 
 	go mod download
+	go mod verify
 
 build:
-	GOOS=linux go build -o bin/${APPLICATION_NAME} -v cmd/${APPLICATION_NAME}.go
+	CGO_ENABLED=0 GOOS=linux go build -o bin/${APPLICATION_NAME} -v cmd/${APPLICATION_NAME}.go
 
 ide-build:
 	@$(MAKE) build success || $(MAKE) failure
@@ -22,11 +23,6 @@ clean-test-data:
 	if [ -f ./coverage.out ]; then rm ./coverage.out; fi;
 
 test:
-	@$(MAKE) clean-test-data
-	go test ./... -coverprofile=coverage.out -count=1
-	go tool cover -html=coverage.out -o coverage.html
-
-test-long:
 	@$(MAKE) clean-test-data
 	go test ./... -coverprofile=coverage.out -bench . -count=1
 	go tool cover -html=coverage.out -o coverage.html

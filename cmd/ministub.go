@@ -73,7 +73,10 @@ func parseArgs() (cfgPath string, bind string, port int, err error) {
 	}
 	if len(cfgPath) == 0 {
 		if cwd, err := os.Getwd(); err == nil {
-			cfgPath = fmt.Sprintf("%s/ministub.yml", cwd)
+			if string(cwd[len(cwd)-1]) != "/" {
+				cwd += "/"
+			}
+			cfgPath = fmt.Sprintf("%sministub.yml", cwd)
 		} else {
 			return "", "", -1, err
 		}
