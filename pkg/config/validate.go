@@ -1,6 +1,9 @@
 package config
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+)
 
 // Validate ensures the loaded config meets the required standard
 func Validate(cfg *Config) (err error) {
@@ -63,4 +66,24 @@ func validateJSON(input interface{}) interface{} {
 		return correctJSON
 	}
 	return input
+}
+
+// getEnvValueForField checks if a given string value is actually trying to use an environment variable, and replaces it if so
+func getEnvValueForField(field string) (string, error) {
+	if string(field[0]) == "$" {
+		searchVar := field[1:]
+
+		switch {
+		case searchVar == "HOSTNAME":
+			newField, err := os.Hostname()
+			if err != nil {
+				return "", fmt.Errorf("Unable To Get Requested Hostname: %s", err.Error())
+			}
+			return newField, err
+		default:
+			return os.Getenv(searchVar), nil
+		}
+	}
+
+	return field, nil
 }

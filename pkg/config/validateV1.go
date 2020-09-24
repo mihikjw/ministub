@@ -9,6 +9,14 @@ func validateV1Config(cfg *Config) error {
 	serviceNames := make(map[string]bool)
 	if len(cfg.Services) > 0 {
 		for serviceName, entry := range cfg.Services {
+			if len(entry.Hostname) > 0 {
+				var err error
+				entry.Hostname, err = getEnvValueForField(entry.Hostname)
+				if err != nil {
+					return err
+				}
+			}
+
 			if len(entry.Hostname) == 0 || (entry.Port <= 0 || entry.Port > 65535) {
 				return fmt.Errorf("Invalid Service Entry For Service: %s", serviceName)
 			}
@@ -24,91 +32,22 @@ func validateV1Config(cfg *Config) error {
 
 	if len(cfg.Requests) > 0 {
 		for reqName, entry := range cfg.Requests {
-			// only mandatory fields are URL and expected response code
-			if len(entry.URL) == 0 {
-				return fmt.Errorf("URL For Request %s Is Empty", reqName)
-			}
-			if !validateV1Method(entry.Method) {
-				return fmt.Errorf("Method %s For Request %s Not Supported", entry.Method, reqName)
-			}
-			if len(entry.Protocol) > 0 {
-				if !validateV1Protocol(entry.Protocol) {
-					return fmt.Errorf("Protocol %s For Request %s Not Supported", entry.Protocol, reqName)
-				}
-			} else {
-				entry.Protocol = "http" // default if ommitted
-			}
-			if entry.ExpectedResponse != nil {
-				if entry.ExpectedResponse.StatusCode == 0 {
-					return fmt.Errorf("Status Code For Request %s Is Invalid", reqName)
-				}
-				if entry.ExpectedResponse.Body != nil && len(entry.ExpectedResponse.Body) > 0 {
-					for expectedField, expectedType := range entry.ExpectedResponse.Body {
-						if strExpectedType, ok := expectedType.(string); ok && !supportedType(strExpectedType) {
-							return fmt.Errorf("Request %s Expected Response Invalid Expected Type For Field %s: %s", reqName, expectedField, expectedType)
-						}
-					}
-				}
-			}
-			if entry.Body != nil && len(entry.Body) > 0 {
-				entry.Body = validateJSON(entry.Body).(map[string]interface{})
+			if err := validateV1Request(reqName, entry); err != nil {
+				return err
 			}
 		}
 	}
 
-	if len(cfg.Endpoints) == 0 {
+	if len(cfg.Endpoints) > 0 {
+		for url, methodMap := range cfg.Endpoints {
+			for method, entry := range methodMap {
+				if err := validateV1Endpoint(url, method, entry, serviceNames); err != nil {
+					return err
+				}
+			}
+		}
+	} else {
 		return fmt.Errorf("No Endpoints Set")
-	}
-
-	for url, methodMap := range cfg.Endpoints {
-		for method, entry := range methodMap {
-			if entry.Params != nil {
-				if len(entry.Params.Path) > 0 {
-					if err := validateV1Parameters(entry.Params.Path); err != nil {
-						return fmt.Errorf("Path Param For URL %s, Method %s Not Valid: %s", url, method, err.Error())
-					}
-				}
-				if len(entry.Params.Query) > 0 {
-					if err := validateV1Parameters(entry.Params.Query); err != nil {
-						return fmt.Errorf("Query Param For URL %s, Method %s Not Valid: %s", url, method, err.Error())
-					}
-				}
-			}
-
-			if entry.Recieves != nil {
-				for name, exType := range entry.Recieves.Body {
-					if !supportedType(exType) {
-						return fmt.Errorf("Body Field Type For URL %s, Method %s, Field %s Type Is Not Supported: %s", url, method, name, exType)
-					}
-				}
-			}
-
-			if entry.Responses == nil && entry.Response == 0 {
-				return fmt.Errorf("Response Not Set For URL %s, Method %s", url, method)
-			}
-
-			if entry.Responses != nil {
-				totalWeight := 0
-				for _, respEntry := range entry.Responses {
-					totalWeight += respEntry.Weight
-
-					if len(respEntry.Actions) > 0 {
-						if err := validateV1Actions(respEntry.Actions, serviceNames); err != nil {
-							return fmt.Errorf("Error Validating Response Action URL %s, Method %s: %s", url, method, err.Error())
-						}
-					}
-				}
-				if totalWeight != 100 {
-					return fmt.Errorf("Response Weighting For URL %s, Method %s, Does Not Equal 100", url, method)
-				}
-			}
-
-			if len(entry.Actions) > 0 {
-				if err := validateV1Actions(entry.Actions, serviceNames); err != nil {
-					return fmt.Errorf("Error Validating URL %s, Method %s: %s", url, method, err.Error())
-				}
-			}
-		}
 	}
 
 	return nil
@@ -180,4 +119,94 @@ func validateV1Protocol(protocol string) bool {
 	default:
 		return false
 	}
+}
+
+// validateV1Endpoints ensures a given endpoint definition is valid
+func validateV1Endpoint(url, method string, entry *Endpoint, serviceNames map[string]bool) error {
+	if entry.Params != nil {
+		if len(entry.Params.Path) > 0 {
+			if err := validateV1Parameters(entry.Params.Path); err != nil {
+				return fmt.Errorf("Path Param For URL %s, Method %s Not Valid: %s", url, method, err.Error())
+			}
+		}
+		if len(entry.Params.Query) > 0 {
+			if err := validateV1Parameters(entry.Params.Query); err != nil {
+				return fmt.Errorf("Query Param For URL %s, Method %s Not Valid: %s", url, method, err.Error())
+			}
+		}
+	}
+
+	if entry.Recieves != nil {
+		for name, exType := range entry.Recieves.Body {
+			if !supportedType(exType) {
+				return fmt.Errorf("Body Field Type For URL %s, Method %s, Field %s Type Is Not Supported: %s", url, method, name, exType)
+			}
+		}
+	}
+
+	if entry.Responses == nil && entry.Response == 0 {
+		return fmt.Errorf("Response Not Set For URL %s, Method %s", url, method)
+	}
+
+	if entry.Responses != nil {
+		totalWeight := 0
+		for _, respEntry := range entry.Responses {
+			totalWeight += respEntry.Weight
+
+			if len(respEntry.Actions) > 0 {
+				if err := validateV1Actions(respEntry.Actions, serviceNames); err != nil {
+					return fmt.Errorf("Error Validating Response Action URL %s, Method %s: %s", url, method, err.Error())
+				}
+			}
+		}
+		if totalWeight != 100 {
+			return fmt.Errorf("Response Weighting For URL %s, Method %s, Does Not Equal 100", url, method)
+		}
+	}
+
+	if len(entry.Actions) > 0 {
+		if err := validateV1Actions(entry.Actions, serviceNames); err != nil {
+			return fmt.Errorf("Error Validating URL %s, Method %s: %s", url, method, err.Error())
+		}
+	}
+
+	return nil
+}
+
+// validateV1Request ensures a given request field is valid; only mandatory fields are URL and expected response code
+func validateV1Request(reqName string, entry *Request) error {
+	if len(entry.URL) == 0 {
+		return fmt.Errorf("URL For Request %s Is Empty", reqName)
+	}
+
+	if !validateV1Method(entry.Method) {
+		return fmt.Errorf("Method %s For Request %s Not Supported", entry.Method, reqName)
+	}
+
+	if len(entry.Protocol) > 0 {
+		if !validateV1Protocol(entry.Protocol) {
+			return fmt.Errorf("Protocol %s For Request %s Not Supported", entry.Protocol, reqName)
+		}
+	} else {
+		entry.Protocol = "http" // default if ommitted
+	}
+
+	if entry.ExpectedResponse != nil {
+		if entry.ExpectedResponse.StatusCode == 0 {
+			return fmt.Errorf("Status Code For Request %s Is Invalid", reqName)
+		}
+		if entry.ExpectedResponse.Body != nil && len(entry.ExpectedResponse.Body) > 0 {
+			for expectedField, expectedType := range entry.ExpectedResponse.Body {
+				if strExpectedType, ok := expectedType.(string); ok && !supportedType(strExpectedType) {
+					return fmt.Errorf("Request %s Expected Response Invalid Expected Type For Field %s: %s", reqName, expectedField, expectedType)
+				}
+			}
+		}
+	}
+
+	if entry.Body != nil && len(entry.Body) > 0 {
+		entry.Body = validateJSON(entry.Body).(map[string]interface{})
+	}
+
+	return nil
 }
