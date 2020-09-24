@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"io"
 	"log"
 	"os"
 )
@@ -12,27 +13,24 @@ type StdLogger struct {
 }
 
 // NewStdLogger creates a new instance of a logger to StdOut, StdErr
-func NewStdLogger() *StdLogger {
-	return &StdLogger{
-		stdOut: log.New(os.Stdout, "INFO: ", log.LstdFlags),
-		stdErr: log.New(os.Stderr, "ERROR: ", log.LstdFlags),
-	}
+func NewStdLogger() (result *StdLogger) {
+	result = new(StdLogger)
+	result.stdOut = createOutput(os.Stdout, "INFO: ")
+	result.stdErr = createOutput(os.Stderr, "ERROR: ")
+	return result
 }
 
 // Info logs a message to StdOut
-func (l *StdLogger) Info(msg string) error {
+func (l *StdLogger) Info(msg string) {
 	l.stdOut.Print(msg)
-	return nil
 }
 
 // Error logs a message to StdErr
-func (l *StdLogger) Error(msg string) error {
+func (l *StdLogger) Error(msg string) {
 	l.stdErr.Print(msg)
-	return nil
 }
 
-// Fatal logs a message and exits the application, designed to be used in startup
-func (l *StdLogger) Fatal(msg string) error {
-	l.stdErr.Fatal(msg)
-	return nil
+// createOutput creates a logger output suitable for writing too
+func createOutput(output io.Writer, prefix string) *log.Logger {
+	return log.New(output, prefix, log.LstdFlags)
 }

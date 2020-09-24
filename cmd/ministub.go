@@ -15,18 +15,18 @@ func main() {
 
 	cfgPath, bindHost, port, err := parseArgs()
 	if err != nil {
-		log.Fatal(fmt.Sprintf("Startup Error: %s", err.Error()))
+		logFatal(log, fmt.Sprintf("Startup Error: %s", err.Error()))
 	}
 
 	log.Info("Loading Config...")
 
 	cfg, err := config.LoadFromFile(cfgPath)
 	if err != nil {
-		log.Fatal(fmt.Sprintf("Unable To Load From From Path %s: %s", cfgPath, err.Error()))
+		logFatal(log, fmt.Sprintf("Unable To Load From From Path %s: %s", cfgPath, err.Error()))
 	}
 
 	if err = config.Validate(cfg); err != nil {
-		log.Fatal(fmt.Sprintf("Config Validation Error: %s", err.Error()))
+		logFatal(log, fmt.Sprintf("Config Validation Error: %s", err.Error()))
 	}
 
 	log.Info(fmt.Sprintf("Config Loaded From Path: %s", cfgPath))
@@ -39,13 +39,20 @@ func main() {
 			go api.ExecuteActions(cfg.StartupActions, "Startup", cfg, log, requester)
 		}
 
-		log.Fatal(
+		logFatal(
+			log,
 			fmt.Sprintf(
 				"Fatal Error: %s",
 				server.ListenAndServe(bindHost, port).Error(),
 			),
 		)
 	}
+}
+
+// logFatal prints the given message to the logger error stream then os.Exit(1)
+func logFatal(log logger.Logger, msg string) {
+	log.Error(msg)
+	os.Exit(1)
 }
 
 // parseArgs parses the cmd args and returns

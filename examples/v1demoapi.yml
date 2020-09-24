@@ -18,7 +18,7 @@ requests:
         headers: 
             Content-Type: application/json
         body:
-            orchestrator_hostname: $HOSTNAME
+            orchestrator_hostname: localhost
             workflow_exec_id: 5
             job_exec_id: 24
             password: dibble
