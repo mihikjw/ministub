@@ -12,12 +12,13 @@ import (
 
 func main() {
 	log := logger.NewLogger("std")
-	log.Info("Loading Config...")
 
 	cfgPath, bindHost, port, err := parseArgs()
 	if err != nil {
 		log.Fatal(fmt.Sprintf("Startup Error: %s", err.Error()))
 	}
+
+	log.Info("Loading Config...")
 
 	cfg, err := config.LoadFromFile(cfgPath)
 	if err != nil {
@@ -52,7 +53,7 @@ func parseArgs() (cfgPath string, bind string, port int, err error) {
 	for i, data := range os.Args {
 		switch {
 		case data == "-h":
-			fmt.Printf("\n")
+			fmt.Printf("ministub is an API stubbing tool allowing follow-on actions from an incoming request\n\nUsage:\nministub [path]\n\t-h: Help\n\t-p: Port\n\t-h: Accept Host\n")
 			os.Exit(0)
 		case data == "-p":
 			port, err = strconv.Atoi(os.Args[i+1])

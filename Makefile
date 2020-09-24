@@ -1,9 +1,9 @@
 APPLICATION_NAME = ministub
 
 all:
-	@$(MAKE) create-dir install test build success || $(MAKE) failure
+	@$(MAKE) create-dir deps test build success || $(MAKE) failure
 
-install: 
+deps: 
 	go mod download
 	go mod verify
 
@@ -12,6 +12,9 @@ build:
 
 ide-build:
 	@$(MAKE) build success || $(MAKE) failure
+
+install:
+	cp ./bin/ministub /usr/local/bin
 
 clean:
 	go clean

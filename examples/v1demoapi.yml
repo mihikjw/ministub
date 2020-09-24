@@ -7,9 +7,9 @@ services:
         port: 6010
 startupActions:
     - delay: 10
-    # - request:
-    #     target: testService
-    #     id: processJob
+    - request:
+        target: testService
+        id: processJob
 requests:
     processJob:
         url: /api/v1/job
