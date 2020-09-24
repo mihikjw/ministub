@@ -53,7 +53,7 @@ func parseArgs() (cfgPath string, bind string, port int, err error) {
 	for i, data := range os.Args {
 		switch {
 		case data == "-h":
-			fmt.Printf("ministub is an API stubbing tool allowing follow-on actions from an incoming request\n\nUsage:\nministub [path]\n\t-h: Help\n\t-p: Port\n\t-h: Accept Host\n")
+			fmt.Printf("ministub is an API stubbing tool allowing follow-on actions from an incoming request\n\nUsage:\nministub [path]\n\t-h: Help\n\t-p: Port\n\t-b: Accept Host\n")
 			os.Exit(0)
 		case data == "-p":
 			port, err = strconv.Atoi(os.Args[i+1])
