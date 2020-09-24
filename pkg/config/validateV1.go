@@ -195,6 +195,7 @@ func validateV1Request(reqName string, entry *Request) error {
 		if entry.ExpectedResponse.StatusCode == 0 {
 			return fmt.Errorf("Status Code For Request %s Is Invalid", reqName)
 		}
+
 		if entry.ExpectedResponse.Body != nil && len(entry.ExpectedResponse.Body) > 0 {
 			for expectedField, expectedType := range entry.ExpectedResponse.Body {
 				if strExpectedType, ok := expectedType.(string); ok && !supportedType(strExpectedType) {
