@@ -175,6 +175,10 @@ func validateV1Endpoint(url, method string, entry *Endpoint, serviceNames map[st
 
 // validateV1Request ensures a given request field is valid; only mandatory fields are URL and expected response code
 func validateV1Request(reqName string, entry *Request) error {
+	if entry == nil {
+		return fmt.Errorf("Entry Is Nil")
+	}
+
 	if len(entry.URL) == 0 {
 		return fmt.Errorf("URL For Request %s Is Empty", reqName)
 	}

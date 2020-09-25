@@ -5,6 +5,12 @@ import (
 	"os"
 )
 
+// osHostname returns the hostname of the OS
+var osHostname = os.Hostname
+
+// osGetenv returns the requested environment variable
+var osGetenv = os.Getenv
+
 // Validate ensures the loaded config meets the required standard
 func Validate(cfg *Config) (err error) {
 	switch cfg.Version {
@@ -75,13 +81,13 @@ func getEnvValueForField(field string) (string, error) {
 
 		switch {
 		case searchVar == "HOSTNAME":
-			newField, err := os.Hostname()
+			newField, err := osHostname()
 			if err != nil {
 				return "", fmt.Errorf("Unable To Get Requested Hostname: %s", err.Error())
 			}
 			return newField, err
 		default:
-			return os.Getenv(searchVar), nil
+			return osGetenv(searchVar), nil
 		}
 	}
 

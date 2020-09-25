@@ -20,7 +20,7 @@ type Config struct {
 	Services       map[string]*Service             `yaml:"services"`
 	StartupActions []map[string]interface{}        `yaml:"startupActions"`
 	Requests       map[string]*Request             `yaml:"requests"`
-	Endpoints      map[string]map[string]*Endpoint `yaml:"endpoints"`
+	Endpoints      map[string]map[string]*Endpoint `yaml:"endpoints"` // url -> method : endpoint
 }
 
 // LoadFromFile creates a new Config object from the given filepath

@@ -19,14 +19,10 @@ install:
 clean:
 	go clean
 	if [ -f ./bin/${APPLICATION_NAME} ]; then rm ./bin/${APPLICATION_NAME}; fi;
-	@$(MAKE) clean-test-data
-
-clean-test-data:
 	if [ -f ./coverage.html ]; then rm ./coverage.html; fi;
 	if [ -f ./coverage.out ]; then rm ./coverage.out; fi;
 
 test:
-	@$(MAKE) clean-test-data
 	go test ./... -coverprofile=coverage.out -bench . -count=1
 	go tool cover -html=coverage.out -o coverage.html
 

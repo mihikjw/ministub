@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"time"
 )
@@ -36,4 +37,16 @@ func (mfi *MockFileInfo) IsDir() bool {
 // Sys mocks os.FileInfo.Sys
 func (mfi *MockFileInfo) Sys() interface{} {
 	return nil
+}
+
+// -------------------------
+
+// mockInvalidOsGetenv mocks an invalid response from os.Getenv
+func mockInvalidOsGetenv(value string) string {
+	return ""
+}
+
+// mockInvalidOsHostname mocks an invalid response from os.Hostname
+func mockInvalidOsHostname() (string, error) {
+	return "", fmt.Errorf("Test Error")
 }
