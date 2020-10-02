@@ -25,7 +25,7 @@ func validateV1Config(cfg *Config) error {
 	}
 
 	if len(cfg.StartupActions) > 0 {
-		if err := validateV1Actions(cfg.StartupActions, serviceNames); err != nil {
+		if err := validateV1Actions(cfg.StartupActions, serviceNames, cfg.Requests); err != nil {
 			return fmt.Errorf("Failed Validating Startup Actions: %s", err.Error())
 		}
 	}
@@ -41,7 +41,7 @@ func validateV1Config(cfg *Config) error {
 	if len(cfg.Endpoints) > 0 {
 		for url, methodMap := range cfg.Endpoints {
 			for method, entry := range methodMap {
-				if err := validateV1Endpoint(url, method, entry, serviceNames); err != nil {
+				if err := validateV1Endpoint(url, method, entry, serviceNames, cfg.Requests); err != nil {
 					return err
 				}
 			}
@@ -54,7 +54,7 @@ func validateV1Config(cfg *Config) error {
 }
 
 // validateV1Actions ensures an 'actions' field for a V1 config is correct
-func validateV1Actions(actions []map[string]interface{}, serviceNames map[string]bool) error {
+func validateV1Actions(actions []map[string]interface{}, serviceNames map[string]bool, requests map[string]*Request) error {
 	for _, actionMap := range actions {
 		for actionName, actionEntry := range actionMap {
 			if !supportedAction(actionName) {
@@ -68,6 +68,14 @@ func validateV1Actions(actions []map[string]interface{}, serviceNames map[string
 						}
 					} else {
 						return fmt.Errorf("No Target Defined For Request Action")
+					}
+
+					if requestName, found := newActionEntry["id"]; found {
+						if _, found := requests[requestName.(string)]; !found {
+							return fmt.Errorf("Request ID Not Defined For Request Action %s", requestName)
+						}
+					} else {
+						return fmt.Errorf("No Request ID Defined For Request Action")
 					}
 				} else {
 					return fmt.Errorf("Invalid Request Value For Request Action")
@@ -122,14 +130,14 @@ func validateV1Protocol(protocol string) bool {
 }
 
 // validateV1Endpoints ensures a given endpoint definition is valid
-func validateV1Endpoint(url, method string, entry *Endpoint, serviceNames map[string]bool) error {
+func validateV1Endpoint(url, method string, entry *Endpoint, serviceNames map[string]bool, requests map[string]*Request) error {
 	if entry.Params != nil {
-		if len(entry.Params.Path) > 0 {
+		if entry.Params.Path != nil && len(entry.Params.Path) > 0 {
 			if err := validateV1Parameters(entry.Params.Path); err != nil {
 				return fmt.Errorf("Path Param For URL %s, Method %s Not Valid: %s", url, method, err.Error())
 			}
 		}
-		if len(entry.Params.Query) > 0 {
+		if entry.Params.Query != nil && len(entry.Params.Query) > 0 {
 			if err := validateV1Parameters(entry.Params.Query); err != nil {
 				return fmt.Errorf("Query Param For URL %s, Method %s Not Valid: %s", url, method, err.Error())
 			}
@@ -154,7 +162,7 @@ func validateV1Endpoint(url, method string, entry *Endpoint, serviceNames map[st
 			totalWeight += respEntry.Weight
 
 			if len(respEntry.Actions) > 0 {
-				if err := validateV1Actions(respEntry.Actions, serviceNames); err != nil {
+				if err := validateV1Actions(respEntry.Actions, serviceNames, requests); err != nil {
 					return fmt.Errorf("Error Validating Response Action URL %s, Method %s: %s", url, method, err.Error())
 				}
 			}
@@ -164,8 +172,8 @@ func validateV1Endpoint(url, method string, entry *Endpoint, serviceNames map[st
 		}
 	}
 
-	if len(entry.Actions) > 0 {
-		if err := validateV1Actions(entry.Actions, serviceNames); err != nil {
+	if entry.Actions != nil && len(entry.Actions) > 0 {
+		if err := validateV1Actions(entry.Actions, serviceNames, requests); err != nil {
 			return fmt.Errorf("Error Validating URL %s, Method %s: %s", url, method, err.Error())
 		}
 	}
@@ -177,6 +185,10 @@ func validateV1Endpoint(url, method string, entry *Endpoint, serviceNames map[st
 func validateV1Request(reqName string, entry *Request) error {
 	if entry == nil {
 		return fmt.Errorf("Entry Is Nil")
+	}
+
+	if len(reqName) == 0 {
+		return fmt.Errorf("reqName Is Empty")
 	}
 
 	if len(entry.URL) == 0 {
