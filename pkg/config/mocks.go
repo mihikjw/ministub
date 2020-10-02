@@ -50,3 +50,13 @@ func mockInvalidOsGetenv(value string) string {
 func mockInvalidOsHostname() (string, error) {
 	return "", fmt.Errorf("Test Error")
 }
+
+// mockValidOsGetenv mocks a valid response from os.Getenv
+func mockValidOsGetenv(value string) string {
+	return "test_value"
+}
+
+// mockValidOsHostname mocks a valid response from os.Hostname
+func mockValidOsHostname() (string, error) {
+	return "test_value", nil
+}

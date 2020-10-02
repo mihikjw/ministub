@@ -79,3 +79,104 @@ func TestValidate2(t *testing.T) {
 		t.Errorf("No Error Raised For Invalid Version Param: %f", cfg.Version)
 	}
 }
+
+// TestSupportedType1 ensures all the supported types are returned correctly as supported
+func TestSupportedType1(t *testing.T) {
+	for _, typeDef := range []string{"string", "integer", "float", "boolean", "array", "object"} {
+		if !supportedType(typeDef) {
+			t.Errorf("Supported Type '%s' Returned As Unsupported", typeDef)
+		}
+	}
+}
+
+// TestSupportedType2 ensures an unsupported type is not returned as supported
+func TestSupportedType2(t *testing.T) {
+	if supportedType("unsupported") {
+		t.Errorf("Unsupported Type 'unsupported' Returned As Supported")
+	}
+}
+
+// TestSupportedAction1 ensures all the supported action types are returned correctly as supported
+func TestSupportedAction1(t *testing.T) {
+	for _, action := range []string{"delay", "request"} {
+		if !supportedAction(action) {
+			t.Errorf("Supported Action '%s' Returned As Unsupported", action)
+		}
+	}
+}
+
+// TestSupportedAction2 ensures an unsupported action is not returned as supported
+func TestSupportedAction2(t *testing.T) {
+	if supportedAction("unsupported") {
+		t.Errorf("Unsupported Action 'unsupported' Returned As Supported")
+	}
+}
+
+// TestValidateJSON1 ensures a given piece of JSON without string-set keys is returned with string-set keys
+func TestValidateJSON1(t *testing.T) {
+	input := map[string]interface{}{
+		"foo": map[interface{}]interface{}{
+			"bar": 1234,
+		},
+	}
+
+	output := validateJSON(input)
+
+	if tmp1, ok := output.(map[string]interface{}); ok {
+		if fooEntry, found := tmp1["foo"]; found {
+			tmp2, ok := fooEntry.(map[string]interface{})
+			if ok {
+				if barEntry, found := tmp2["bar"]; found {
+					if barEntry.(int) != 1234 {
+						t.Errorf("barEntry Does Not Match Input")
+					}
+				} else {
+					t.Errorf("Returned Validated JSON Is Invalid: Missing Key 'bar'")
+				}
+			} else {
+				t.Errorf("Returned Validated JSON Is Invalid: tmp2")
+			}
+		} else {
+			t.Errorf("Returned Validated JSON Is Invalid: Missing Key 'foo'")
+		}
+	} else {
+		t.Errorf("Returned Validated JSON Is Invalid: tmp1")
+	}
+}
+
+// TestValidGetEnvValueForField1 ensures a correct response for getting hostname, env vars and an unmodified value
+func TestValidGetEnvValueForField(t *testing.T) {
+	osHostname = mockValidOsHostname
+	osGetenv = mockValidOsGetenv
+
+	for _, dataToCheck := range []string{"$HOSTNAME", "$ENV_VAR", "test_value"} {
+		checkedData, err := getEnvValueForField(dataToCheck)
+
+		if err != nil {
+			t.Errorf("Error Encountered Getting Env Value For Field: %s", err.Error())
+		}
+
+		if checkedData != "test_value" {
+			t.Errorf("Value Does Not Match 'test_value': %s", checkedData)
+		}
+	}
+
+}
+
+// TestValidGetEnvValueForField2 ensures when a hostname cannot be found, an error is returned
+func TestValidGetEnvValueForField2(t *testing.T) {
+	osHostname = mockInvalidOsHostname
+
+	if _, err := getEnvValueForField("$HOSTNAME"); err == nil {
+		t.Errorf("Invalid Hostname Returned No Error")
+	}
+}
+
+// TestValidGetEnvValueForField3 ensures when an env var cannot be found, an error is returned
+func TestValidGetEnvValueForField3(t *testing.T) {
+	osGetenv = mockInvalidOsGetenv
+
+	if _, err := getEnvValueForField("$ENV_VAR"); err == nil {
+		t.Errorf("Invalid Hostname Returned No Error")
+	}
+}

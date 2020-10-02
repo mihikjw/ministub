@@ -63,20 +63,20 @@ func validateJSON(input interface{}) interface{} {
 		return correctOutput
 	}
 	if invalidJSON, valid := input.(map[interface{}]interface{}); valid {
-		correctJSON := make(map[string]interface{}, len(invalidJSON))
+		correctOutput := make(map[string]interface{}, len(invalidJSON))
 		for k, v := range invalidJSON {
 			if newK, valid := k.(string); valid {
-				correctJSON[newK] = v
+				correctOutput[newK] = validateJSON(v)
 			}
 		}
-		return correctJSON
+		return correctOutput
 	}
 	return input
 }
 
 // getEnvValueForField checks if a given string value is actually trying to use an environment variable, and replaces it if so
 func getEnvValueForField(field string) (string, error) {
-	if string(field[0]) == "$" {
+	if len(field) > 0 && string(field[0]) == "$" {
 		searchVar := field[1:]
 
 		switch {
@@ -85,9 +85,12 @@ func getEnvValueForField(field string) (string, error) {
 			if err != nil {
 				return "", fmt.Errorf("Unable To Get Requested Hostname: %s", err.Error())
 			}
-			return newField, err
+			return newField, nil
 		default:
-			return osGetenv(searchVar), nil
+			if result := osGetenv(searchVar); len(result) != 0 {
+				return result, nil
+			}
+			return "", fmt.Errorf("Env Var Not Found: %s", searchVar)
 		}
 	}
 
