@@ -28,7 +28,3 @@ The `{path}` argument is optional, it will default to `./ministub.yml`.
 ministub uses a YAML format to define an API to host. A fully-featured example can be found at `/examples/v1demopapi.yml`.
 
 - Put more stuff here ...
-
-## TO DO
-- Improve Docs
-- Unit Tests!!
