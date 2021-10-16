@@ -4,9 +4,9 @@
         {
             "label": "Build",
             "type": "shell",
-            "command": "make",
+            "command": "sh",
             "args": [
-                "ide-build"
+                "scripts/build.sh"
             ],
             "group": {
                 "isDefault": true,
@@ -16,17 +16,17 @@
         {
             "label": "Clean",
             "type": "shell",
-            "command": "make",
+            "command": "sh",
             "args": [
-                "clean"
+                "scripts/clean.sh"
             ]
         },
         {
             "label": "Test",
             "type": "shell",
-            "command": "make",
+            "command": "sh",
             "args": [
-                "test"
+                "scripts/test.sh"
             ],
             "group": {
                 "kind": "test",
